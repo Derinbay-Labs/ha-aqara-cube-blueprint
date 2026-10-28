@@ -1,0 +1,166 @@
+blueprint:
+  name: Aqara Cube light remote (Matter signal sync)
+  description: >
+    Control lights with an Aqara Cube paired to an Aqara hub and shared with
+    Home Assistant over Matter. Home Assistant cannot see cube gestures over
+    Matter directly, so each gesture is forwarded through a signal sync
+    sensor that the hub exposes as a binary sensor.
+
+
+    - **Flip 90°** toggles the main lights.
+
+    - **Rotate** steps the main lights' brightness up and wraps to the first
+    step after 100%.
+
+    - **Double tap** turns on the main and the extra lights.
+
+    - **Shake** turns off the main and the extra lights.
+
+
+    Every gesture is optional. Setup instructions are in the
+    [README](https://github.com/Derinbay-Labs/ha-aqara-cube-blueprint).
+  domain: automation
+  author: Taylan Derinbay
+  source_url: https://github.com/Derinbay-Labs/ha-aqara-cube-blueprint/blob/master/blueprints/automation/derinbay/aqara_cube_matter_lights.yaml
+  homeassistant:
+    min_version: "2024.10.0"
+  input:
+    gestures:
+      name: Gesture sensors
+      icon: mdi:cube-outline
+      description: The signal sync binary sensors that the hub turns on for each gesture.
+      input:
+        flip_sensor:
+          name: Flip 90°
+          default: []
+          selector:
+            entity:
+              filter:
+                domain: binary_sensor
+        rotate_sensor:
+          name: Rotate
+          default: []
+          selector:
+            entity:
+              filter:
+                domain: binary_sensor
+        double_tap_sensor:
+          name: Double tap
+          default: []
+          selector:
+            entity:
+              filter:
+                domain: binary_sensor
+        shake_sensor:
+          name: Shake
+          default: []
+          selector:
+            entity:
+              filter:
+                domain: binary_sensor
+    lights:
+      name: Lights
+      icon: mdi:lightbulb-group
+      input:
+        main_lights:
+          name: Main lights
+          description: Toggled by a flip and dimmed by rotating.
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: light
+        extra_lights:
+          name: Extra lights
+          description: Also switched by a double tap and a shake.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: light
+        brightness_step:
+          name: Brightness step
+          description: How far each rotation raises the brightness.
+          default: 25
+          selector:
+            number:
+              min: 5
+              max: 50
+              step: 5
+              unit_of_measurement: "%"
+
+mode: queued
+max: 5
+max_exceeded: silent
+
+triggers:
+  - trigger: state
+    entity_id: !input flip_sensor
+    from: "off"
+    to: "on"
+    id: flip
+  - trigger: state
+    entity_id: !input rotate_sensor
+    from: "off"
+    to: "on"
+    id: rotate
+  - trigger: state
+    entity_id: !input double_tap_sensor
+    from: "off"
+    to: "on"
+    id: double_tap
+  - trigger: state
+    entity_id: !input shake_sensor
+    from: "off"
+    to: "on"
+    id: shake
+
+variables:
+  main_lights: !input main_lights
+  extra_lights: !input extra_lights
+  brightness_step: !input brightness_step
+  all_lights: "{{ main_lights + extra_lights }}"
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: flip
+        sequence:
+          - action: >
+              {{ 'light.turn_off' if main_lights | select('is_state', 'on') | list | count > 0
+                 else 'light.turn_on' }}
+            target:
+              entity_id: "{{ main_lights }}"
+      - conditions:
+          - condition: trigger
+            id: rotate
+        sequence:
+          # Brightest main light that is on, in percent; 0 when all are off.
+          - variables:
+              current: >
+                {{ (main_lights | select('is_state', 'on') | map('state_attr', 'brightness')
+                    | select('number') | max | default(0)) / 255 * 100 }}
+          - action: light.turn_on
+            target:
+              entity_id: "{{ main_lights }}"
+            data:
+              # The +1 absorbs the rounding of 0-255 brightness, so 25% reads as the 25% step.
+              brightness_pct: >
+                {% set next = ((current | float + 1) // brightness_step + 1) * brightness_step %}
+                {{ brightness_step if current | float >= 99 else [next, 100] | min | int }}
+      - conditions:
+          - condition: trigger
+            id: double_tap
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: "{{ all_lights }}"
+      - conditions:
+          - condition: trigger
+            id: shake
+        sequence:
+          - action: light.turn_off
+            target:
+              entity_id: "{{ all_lights }}"
