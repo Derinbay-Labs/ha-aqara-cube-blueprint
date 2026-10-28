@@ -1,6 +1,7 @@
 # Aqara Cube Light Remote for Home Assistant (Matter)
 
 [![Tests](https://github.com/Derinbay-Labs/ha-aqara-cube-blueprint/actions/workflows/tests.yml/badge.svg)](https://github.com/Derinbay-Labs/ha-aqara-cube-blueprint/actions/workflows/tests.yml)
+[![Community forum](https://img.shields.io/badge/community-forum-41BDF5)](https://community.home-assistant.io/t/aqara-cube-light-remote-over-matter-hub-m2-signal-sync/1030703)
 
 An automation blueprint that turns an Aqara Cube into a light remote, for cubes that
 are paired to an Aqara hub and reach Home Assistant over Matter.
@@ -99,6 +100,13 @@ Create an automation from the blueprint and fill in:
 - **No direction or angle.** See *One step per rotation* above. For dimming in both
   directions, pair the cube directly to Home Assistant and use a ZHA or Zigbee2MQTT
   blueprint instead.
+
+## Support
+
+Questions and setup help: the
+[community forum topic](https://community.home-assistant.io/t/aqara-cube-light-remote-over-matter-hub-m2-signal-sync/1030703).
+Bugs and feature requests:
+[GitHub issues](https://github.com/Derinbay-Labs/ha-aqara-cube-blueprint/issues).
 
 ## Development
 
